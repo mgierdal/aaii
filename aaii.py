@@ -12,7 +12,8 @@ import shutil
 import re
 import bs4
 import csv
-
+import openpyxl
+import xlrd
 
 STOCK_IDEAS_URL = r'http://www.aaii.com/stockideas?a=menubarHome'
 
@@ -100,6 +101,9 @@ def save_aaii_screen_page(html):
     with open('stock_screens.html', 'w') as f:
         f.writelines(html)
 def make_screen_info(screen_page_url):
+    """
+    TODO refactor to separate IO from functional code
+    """
     info = {}
     source_url = screen_page_url
     screen_label = screen_page_url.split(r'/')[-1]
@@ -120,6 +124,7 @@ def make_screen_info(screen_page_url):
     #print len(page), screen_title, date
     page = get_aaii_screen_passing_companies_page(screen_label)
     #print len(page)
+    # IO is here:
     save_aaii_screen_composition_page(screen_label, page)
     # http://www.aaii.com/stock-screens/screendata/DualCashFlow
     # http://www.aaii.com/stockscreens/passingco/DualCashFlow
@@ -148,6 +153,8 @@ def extract_table(html):
     return [[col.text for col in row.findAll('td')] for row in table.findAll('tr')]
 ##################################
 
+DOWNLOAD = False
+
 if __name__=='__main__':
     page = get_aaii_screen_performance_page(performance_history_url)
     save_aaii_screen_performance_page(page) # stock_screens.html
@@ -155,7 +162,7 @@ if __name__=='__main__':
     print performance_pages
     for sheets in performance_pages[:]:
         print sheets
-        download_file(sheets)
+        if DOWNLOAD: download_file(sheets)
     page = get_aaii_screen_page() # screens_main_url
     save_aaii_screen_page(page) # stock_screens.html
     screen_pages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_screendata_href(page)]
@@ -166,13 +173,10 @@ if __name__=='__main__':
         if screen['composition']:
             print screen['composition'][-1]
             file_name = screen['label'] + r'.csv'
-            with open(file_name, 'wb') as fout:
-                wr = csv.writer(fout)
-                wr.writerows(screen['composition'])
-    sys.exit()
-
-"""
-    import xlrd
+            if DOWNLOAD:
+                with open(file_name, 'wb') as fout:
+                    wr = csv.writer(fout)
+                    wr.writerows(screen['composition'])
 
     book = xlrd.open_workbook("annualperformance.xlsx")
     print("The number of worksheets is {0}".format(book.nsheets))
@@ -183,28 +187,30 @@ if __name__=='__main__':
     for rx in range(sh.nrows):
         pass#print(sh.row(rx))
     sh.col(2)[4]
-"""
-#
-"""
-    import openpyxl
 
-    wb = openpyxl.load_workbook('annualperformance.xlsx', read_only=True)
-    print wb.get_sheet_names()
-    ws = wb.get_active_sheet()
-    print ws.title
-    print
+    #
+    """
+        import openpyxl
 
-    def get_column(ws, col_idx):
-        #here you iterate over the rows in the specific column
-        ret =  [ [ws["{}{}".format(column, row)].value 
-                  for column in col_idx] 
-                for row in range(1,ws.max_row)]
-        return reduce(lambda x,y: x+y, ret)
+        wb = openpyxl.load_workbook('annualperformance.xlsx', read_only=True)
+        print wb.get_sheet_names()
+        ws = wb.get_active_sheet()
+        print ws.title
+        print
 
-    print get_column(ws, 'C')
+        def get_column(ws, col_idx):
+            #here you iterate over the rows in the specific column
+            ret =  [ [ws["{}{}".format(column, row)].value 
+                      for column in col_idx] 
+                    for row in range(1,ws.max_row)]
+            return reduce(lambda x,y: x+y, ret)
 
-    [(i,x) for i,x in enumerate(get_column(ws, 'C')) if x == 'YTD*']
-"""
+        print get_column(ws, 'C')
+
+        [(i,x) for i,x in enumerate(get_column(ws, 'C')) if x == 'YTD*']
+    """
+    sys.exit()
+    
     # Use 'with' to ensure the session context is closed after use.
     with requests.Session() as s:
         stock_ideas = s.post(STOCK_IDEAS_URL, data=payload)
