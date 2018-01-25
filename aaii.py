@@ -191,7 +191,7 @@ if __name__=='__main__':
                 with open(file_name, 'wb') as fout:
                     wr = csv.writer(fout)
                     wr.writerows(screen['composition'])
-    sys.exit()
+
     book = xlrd.open_workbook("annualperformance.xlsx")
     print("The number of worksheets is {0}".format(book.nsheets))
     print("Worksheet name(s): {0}".format(book.sheet_names()))
