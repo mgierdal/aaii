@@ -23,9 +23,9 @@ PERFORMANCE_MONTHLY = r'http://www.aaii.com/files/spreadsheets/stockideas/monthl
 PERFORMANCE_ANNUALLY   = r'http://www.aaii.com/files/spreadsheets/stockideas/annualperformance.xlsx'
 
 AAII_BASE_URL = r'http://www.aaii.com'
-screens_main_url = r'http://www.aaii.com/stock-screens'
+SCREEN_MAIN_URL = r'http://www.aaii.com/stock-screens'
 screens_mmenubarhome_url = r'http://www.aaii.com/stock-screens?a=menubarHome'
-performance_history_url = r'http://www.aaii.com/stock-screens/performance'
+PERFORMANCE_HISTORY_URL = r'http://www.aaii.com/stock-screens/performance'
 
 # search for http://www.aaii.com/stock-screens/screendata/CANSLIMRev
 
@@ -83,23 +83,30 @@ def find_screendata_href(s):
     ret = [re.findall('".+?"',x)[0] for x in ret]
     ret = [x.strip('"').strip() for x in ret]
     return list(set(ret))
-def find_screen_title(html):
+def extract_screen_title(html):
     # <h1 id="page_title" style="visibility: visible;">Dual Cash Flow Screen</h1>
     # <h1 id="page_title">O'Shaughnessy: Growth Market Leaders Screen</h1>
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html, "lxml")
     title = soup.find('h1', {'id':'page_title'})
-    if title is None: 
-        msg = '<h1 id="page_title" tag not found'
-        raise ValueError(msg)
+    if title is None:
+        title = soup.find('h1')
+        if title is None:
+            msg = '<h1 id="page_title" tag not found'
+            raise ValueError(msg)
     return title.text
-def find_screen_origination_date(s):
+def extract_screen_origination_date(s):
     # <div align="right"><strong>Data as of 9/29/2017</strong></div>
     ptrn = r'<div.+?<strong>(Data as of [0-9/]+)</strong></div>'
     return re.findall(ptrn, s)
+def extract_table(html):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "lxml")
+    table = soup.find('table')
+    return [[col.text for col in row.findAll('td')] for row in table.findAll('tr')]
 ##################################
 def get_aaii_screen_page():
-    url = screens_main_url
+    url = SCREEN_MAIN_URL
     #print url
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
     response = opener.open(url)
@@ -111,25 +118,28 @@ def save_aaii_screen_page_(html):
 def make_screen_info(screen_page_url):
     """
     TODO refactor to separate IO from functional code
+    input format: 'http://www.aaii.com/stockideas/screendata/ValueEstGrowth'
     """
     info = {}
     source_url = screen_page_url
     screen_label = screen_page_url.split(r'/')[-1]
-    print (screen_label, source_url)
+    print 'XTERN: {}'.format((screen_label, source_url))
     info['label'] = screen_label
     info['url'] = source_url
+    # download screen's webpage
     page = urllib2.build_opener(urllib2.HTTPCookieProcessor()).open(source_url).read()
     #if screen_label == 'MAGNETComplexRev': print page[:10]
+    # find screen's name by finding webpage's title
     try:
-        screen_title = find_screen_title(page)
+        screen_title = extract_screen_title(page)
     except Exception, e:
         screen_title = ''
         print ('Error at {}: {}'. format(screen_label, str(e)))
-        print page[:1000]
+        #print page[:1000]
         raise
-    print (screen_title)
+    print 'TITLE: [{}]'.format(screen_title)
     info['full_name'] = screen_title
-    date = re.sub('Data as of ','',find_screen_origination_date(page)[0])
+    date = re.sub('Data as of ','',extract_screen_origination_date(page)[0])
     info['origin_date'] = date
     #print len(page), screen_title, date
     page = get_aaii_screen_passing_companies_page(screen_label)
@@ -152,35 +162,44 @@ def get_aaii_screen_passing_companies_page(label):
     response = opener.open(url)
     page = response.read()
     return page
-def save_aaii_screen_composition_page(label, html):
+def save_aaii_screen_composition_page_(label, html):
+    """
+    original
+    """
     file_name = label + r'.html'
     with open(file_name, 'w') as f:
         f.writelines(html)
-def extract_table(html):
-    from bs4 import BeautifulSoup
-    soup = BeautifulSoup(html, "lxml")
-    table = soup.find('table')
-    return [[col.text for col in row.findAll('td')] for row in table.findAll('tr')]
+def save_aaii_screen_composition_page(label, html):
+    """ TO DO replac with direct save_page()"""
+    file_name = label + r'.html'
+    save_page(html, file_name)
+    
+
 ##################################
 
-DOWNLOAD = True
+DOWNLOAD = False
 
 if __name__=='__main__':
-    page = download_page(performance_history_url)
-    save_page(page, 'performance.html') # stock_screens.html
-    performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page)]
+    # start
+    page_html = download_page(PERFORMANCE_HISTORY_URL)
+    save_page(page_html, 'performance.html') # stock_screens.html
+    # 2 performance Excel sheets
+    performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page_html)]
     print performance_sheets
-
     for sheet in performance_sheets[:]:
         #print sheet
         if DOWNLOAD:
             download_and_save_file(sheet)
             print '{} downloaded'.format(sheet)
-
-    page = get_aaii_screen_page() # screens_main_url
-    save_page(page, 'stock_screens.html') # stock_screens.html
-    screen_pages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_screendata_href(page)]
-    screens = [make_screen_info(screen) for screen in screen_pages[:]]
+    # individual screen files
+    page_html = get_aaii_screen_page() # from SCREEN_MAIN_URL
+    save_page(page_html, 'stock_screens.html')
+    screen_webpages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_screendata_href(page_html)[:]]
+    screens = [make_screen_info(screen) for screen in screen_webpages[:]]
+    for screen in screen_webpages[:]:
+        #make_screen_info(screen)
+        pass
+    sys.exit()
     # saving screens' passing companies
     for screen in screens[:]:
         print screen.keys()
