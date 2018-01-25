@@ -1,0 +1,8 @@
+secrets.py
+
+*.pyc
+
+*.html
+
+*.xlsx
+*.csv
