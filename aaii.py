@@ -42,7 +42,7 @@ payload = {
 #url = LOGIN_URL
 
 
-def download_file(url):
+def download_and_save_file(url):
     """
     from https://stackoverflow.com/questions/16694907/how-to-download-large-file-in-python-with-requests-py
     """
@@ -52,6 +52,22 @@ def download_file(url):
         shutil.copyfileobj(r.raw, f)
 
     return local_filename
+
+def download_page(url):
+    """
+    download page
+    """
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
+    response = opener.open(url)
+    page = response.read()
+    return page
+
+def save_page(html, filename):
+    """
+    save page
+    """
+    with open(filename, 'w') as f:
+        f.writelines(html)
 ##################################
 def find_xlsx_href(s):
     from re import findall
@@ -82,14 +98,6 @@ def find_screen_origination_date(s):
     ptrn = r'<div.+?<strong>(Data as of [0-9/]+)</strong></div>'
     return re.findall(ptrn, s)
 ##################################
-def get_aaii_screen_performance_page(url = PERFORMANCE_ROOT):
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
-    response = opener.open(url)
-    page = response.read()
-    return page
-def save_aaii_screen_performance_page(html):
-    with open('performance.html', 'w') as f:
-        f.writelines(html)
 def get_aaii_screen_page():
     url = screens_main_url
     #print url
@@ -97,9 +105,9 @@ def get_aaii_screen_page():
     response = opener.open(url)
     page = response.read()
     return page
-def save_aaii_screen_page(html):
-    with open('stock_screens.html', 'w') as f:
-        f.writelines(html)
+def save_aaii_screen_page_(html):
+    save_page(html, 'stock_screens.html')
+    
 def make_screen_info(screen_page_url):
     """
     TODO refactor to separate IO from functional code
@@ -111,12 +119,14 @@ def make_screen_info(screen_page_url):
     info['label'] = screen_label
     info['url'] = source_url
     page = urllib2.build_opener(urllib2.HTTPCookieProcessor()).open(source_url).read()
-    #if screen_label == 'MAGNETComplexRev': print page
+    #if screen_label == 'MAGNETComplexRev': print page[:10]
     try:
         screen_title = find_screen_title(page)
     except Exception, e:
         screen_title = ''
         print ('Error at {}: {}'. format(screen_label, str(e)))
+        print page[:1000]
+        raise
     print (screen_title)
     info['full_name'] = screen_title
     date = re.sub('Data as of ','',find_screen_origination_date(page)[0])
@@ -153,18 +163,22 @@ def extract_table(html):
     return [[col.text for col in row.findAll('td')] for row in table.findAll('tr')]
 ##################################
 
-DOWNLOAD = False
+DOWNLOAD = True
 
 if __name__=='__main__':
-    page = get_aaii_screen_performance_page(performance_history_url)
-    save_aaii_screen_performance_page(page) # stock_screens.html
-    performance_pages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page)]
-    print performance_pages
-    for sheets in performance_pages[:]:
-        print sheets
-        if DOWNLOAD: download_file(sheets)
+    page = download_page(performance_history_url)
+    save_page(page, 'performance.html') # stock_screens.html
+    performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page)]
+    print performance_sheets
+
+    for sheet in performance_sheets[:]:
+        #print sheet
+        if DOWNLOAD:
+            download_and_save_file(sheet)
+            print '{} downloaded'.format(sheet)
+
     page = get_aaii_screen_page() # screens_main_url
-    save_aaii_screen_page(page) # stock_screens.html
+    save_page(page, 'stock_screens.html') # stock_screens.html
     screen_pages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_screendata_href(page)]
     screens = [make_screen_info(screen) for screen in screen_pages[:]]
     # saving screens' passing companies
@@ -177,7 +191,7 @@ if __name__=='__main__':
                 with open(file_name, 'wb') as fout:
                     wr = csv.writer(fout)
                     wr.writerows(screen['composition'])
-
+    sys.exit()
     book = xlrd.open_workbook("annualperformance.xlsx")
     print("The number of worksheets is {0}".format(book.nsheets))
     print("Worksheet name(s): {0}".format(book.sheet_names()))
@@ -223,5 +237,5 @@ if __name__=='__main__':
         #r = s.get(PERFORMANCE_MONTHLY)
         #print (r.text)
         
-        download_file(PERFORMANCE_MONTHLY)
-        download_file(PERFORMANCE_ANNUALLY)
+        download_and_save_file(PERFORMANCE_MONTHLY)
+        download_and_save_file(PERFORMANCE_ANNUALLY)
