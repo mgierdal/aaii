@@ -12,6 +12,7 @@ import shutil
 import re
 import bs4
 import csv
+import pandas as pd
 import openpyxl
 import xlrd
 
@@ -177,10 +178,11 @@ def save_aaii_screen_composition_page(label, html):
 
 ##################################
 
-DOWNLOAD = False
+DOWNLOAD = True
 
 if __name__=='__main__':
     # start
+    
     page_html = download_page(PERFORMANCE_HISTORY_URL)
     save_page(page_html, 'performance.html') # stock_screens.html
     # 2 performance Excel sheets
@@ -199,7 +201,7 @@ if __name__=='__main__':
     for screen in screen_webpages[:]:
         #make_screen_info(screen)
         pass
-    sys.exit()
+    #sys.exit()
     # saving screens' passing companies
     for screen in screens[:]:
         print screen.keys()
@@ -210,7 +212,22 @@ if __name__=='__main__':
                 with open(file_name, 'wb') as fout:
                     wr = csv.writer(fout)
                     wr.writerows(screen['composition'])
-
+    
+##    Driehaus.html
+##    Foolish8.html
+##    Foolish8Rev.html
+##    Rule1.html
+    
+    listing = os.listdir('.')
+    df_aggr = pd.DataFrame(None)
+    for fn in [x for x in listing if os.path.splitext(x)[-1] in ['.csv']][:]:
+        df = pd.read_csv(os.path.abspath(fn))
+        df['screen'] = os.path.splitext(fn)[0]
+        df_aggr = df_aggr.append(df, ignore_index=True)
+    print df_aggr.shape
+    print df_aggr.groupby('Ticker')['Ticker'].filter(lambda x:x.count()>1)
+    sys.exit()
+    ##################
     book = xlrd.open_workbook("annualperformance.xlsx")
     print("The number of worksheets is {0}".format(book.nsheets))
     print("Worksheet name(s): {0}".format(book.sheet_names()))
