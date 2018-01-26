@@ -1,8 +1,18 @@
+# credentials
 secrets.py
 
+# Compiled python modules.
 *.pyc
 
-*.html
+# Setuptools distribution folder.
+/dist/
 
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+
+# Excel
 *.xlsx
 *.csv
+
+# HTML
+*.html
