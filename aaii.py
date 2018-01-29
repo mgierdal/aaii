@@ -15,8 +15,10 @@ import csv
 import pandas as pd
 import openpyxl
 import xlrd
+import collections
 
-STOCK_IDEAS_URL = r'http://www.aaii.com/stockideas?a=menubarHome'
+
+STOCK_IDEAS_URL = r'http://www.aaii.com/stockideas' #+ '?a=menubarHome'
 
 # all screens
 PERFORMANCE_ROOT    = r'http://www.aaii.com/stockideas/performance' # also redirected from 
@@ -58,6 +60,14 @@ def download_page(url):
     """
     download page
     """
+    response = requests.get(STOCK_IDEAS_URL)
+    return response.text.split('\r\n')
+
+
+def download_page_(url):
+    """
+    download page
+    """
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
     response = opener.open(url)
     page = response.read()
@@ -67,6 +77,8 @@ def save_page(html, filename):
     """
     save page
     """
+    import types
+    assert type(html) == types.ListType
     with open(filename, 'w') as f:
         f.writelines(html)
 ##################################
@@ -182,11 +194,12 @@ DOWNLOAD = True
 
 if __name__=='__main__':
     # start
-    
+    print 'DUPA'
     page_html = download_page(PERFORMANCE_HISTORY_URL)
     save_page(page_html, 'performance.html') # stock_screens.html
     # 2 performance Excel sheets
     performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page_html)]
+    
     print performance_sheets
     for sheet in performance_sheets[:]:
         #print sheet
@@ -225,7 +238,9 @@ if __name__=='__main__':
         df['screen'] = os.path.splitext(fn)[0]
         df_aggr = df_aggr.append(df, ignore_index=True)
     print df_aggr.shape
-    print df_aggr.groupby('Ticker')['Ticker'].filter(lambda x:x.count()>1)
+    #counts = collections.Counter(df_aggr.Ticker.values)
+    #print counts
+    #print df_aggr.groupby('Ticker')['Ticker'].filter(lambda x:x.count()>1)
     sys.exit()
     ##################
     book = xlrd.open_workbook("annualperformance.xlsx")
