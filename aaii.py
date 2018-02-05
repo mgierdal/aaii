@@ -32,6 +32,10 @@ PERFORMANCE_HISTORY_URL = r'http://www.aaii.com/stock-screens/performance'
 
 # search for http://www.aaii.com/stock-screens/screendata/CANSLIMRev
 
+""" NEW URL PATTERN
+http://www.aaii.com/stockideas/screendata/MAGNETComplex
+http://www.aaii.com/files/spreadsheets/stockideas/passingcompanies/MAGNETComplex.xlsx
+"""
 # individual screens
 r'http://www.aaii.com/stockideas/screendata/CashRichFirms'
 r'http://www.aaii.com/files/spreadsheets/stockideas/passingcompanies/CashRichFirms.xlsx'
@@ -85,6 +89,10 @@ def save_page(html, filename):
 def find_xlsx_href(s):
     from re import findall
     ptrn = r'(href.+?xlsx)'
+    return findall(ptrn, s)
+def extract_screen_urls(s):
+    from re import findall
+    ptrn = r'(href.+?screendata.?")'
     return findall(ptrn, s)
 def find_screendata_href(s):
     """
@@ -195,18 +203,23 @@ DOWNLOAD = True
 if __name__=='__main__':
     # start
     print 'DUPA'
-    page_html = download_page(PERFORMANCE_HISTORY_URL)
-    save_page(page_html, 'performance.html') # stock_screens.html
-    # 2 performance Excel sheets
-    performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(page_html)]
+    page_html = download_page(STOCK_IDEAS_URL)
+    print len(page_html)
+    root = bs4.BeautifulSoup(reduce(lambda x,y:x+y,page_html), 'lxml')
     
-    print performance_sheets
+    save_page([line.encode('utf-8') for line in page_html], 'performance.html') # stock_screens.html
+    # 2 performance Excel sheets
+    print extract_screen_urls(reduce(lambda x,y:x+y, page_html))
+    performance_sheets = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_xlsx_href(reduce(lambda x,y:x+y, page_html))]
+    
+    print 'Perf Sheets:', performance_sheets
     for sheet in performance_sheets[:]:
         #print sheet
         if DOWNLOAD:
             download_and_save_file(sheet)
             print '{} downloaded'.format(sheet)
     # individual screen files
+    sys.exit()
     page_html = get_aaii_screen_page() # from SCREEN_MAIN_URL
     save_page(page_html, 'stock_screens.html')
     screen_webpages = [r''.join([AAII_BASE_URL, re.sub(r'href.*?"','',x)]) for x in find_screendata_href(page_html)[:]]
